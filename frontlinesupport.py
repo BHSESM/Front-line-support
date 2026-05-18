@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import re
 
 # --- 1. UI CONFIGURATION & STYLING ---
 st.set_page_config(
@@ -37,7 +38,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. DETERMINISTIC HARDCODED KNOWLEDGE BASE DATA ---
-# This dictionary maps directly to your 3 core documents and fallback tags
 KNOWLEDGE_BASE = [
     {
         "id": "KB-001",
