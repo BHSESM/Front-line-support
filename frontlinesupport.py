@@ -60,8 +60,8 @@ def load_and_parse_text_kb():
     
     with open(filename, "r", encoding="utf-8") as f:
         for raw_line in f:
-            # CACHE BUSTER: Fully isolated string replacement logic avoiding any escape characters
-            anchor_pattern = r"\"
+            # FIX: Using normal string styling with double-escaped slashes. No raw string literals used.
+            anchor_pattern = "\\"
             clean_line_string = re.sub(anchor_pattern, "", raw_line)
             line_str = clean_line_string.strip()
             
@@ -77,7 +77,7 @@ def load_and_parse_text_kb():
                 
                 title = line_str.lstrip("# ").strip()
                 
-                clean_title_words = re.sub(r'[^\w\s]', ' ', title.lower()).split()
+                clean_title_words = re.sub("[^\\w\\s]", " ", title.lower()).split()
                 auto_tags = [w for w in clean_title_words if w not in stop_words and len(w) > 1]
                 
                 current_article = {
@@ -90,7 +90,7 @@ def load_and_parse_text_kb():
                 if current_article:
                     current_article["lines"].append(line_str)
                     
-                    clean_content_words = re.sub(r'[^\w\s]', ' ', line_str.lower()).split()
+                    clean_content_words = re.sub("[^\\w\\s]", " ", line_str.lower()).split()
                     for w in clean_content_words:
                         if w not in stop_words and len(w) > 2 and w not in current_article["tags"]:
                             current_article["tags"].append(w)
@@ -108,7 +108,7 @@ def search_knowledge_base(query_string):
     if not query_string.strip() or not KNOWLEDGE_BASE:
         return None, 0
         
-    cleaned_query = re.sub(r'[^\w\s]', ' ', query_string.lower())
+    cleaned_query = re.sub("[^\\w\\s]", " ", query_string.lower())
     query_words = cleaned_query.split()
     
     best_match = None
@@ -116,7 +116,7 @@ def search_knowledge_base(query_string):
     
     for article in KNOWLEDGE_BASE:
         score = 0
-        title_clean = re.sub(r'[^\w\s]', ' ', article["title"].lower())
+        title_clean = re.sub("[^\\w\\s]", " ", article["title"].lower())
         body_clean = article["body_text"].lower()
         
         for word in query_words:
@@ -160,7 +160,7 @@ if engineer_query:
                     if "\t" in l:
                         row_cells = [cell.strip() for cell in l.split("\t") if cell.strip() != ""]
                     elif "   " in l:
-                        row_cells = [cell.strip() for cell in re.split(r'\s{2,}', l) if cell.strip() != ""]
+                        row_cells = [cell.strip() for cell in re.split("\\s{2,}", l) if cell.strip() != ""]
                     else:
                         row_cells = [cell.strip() for cell in l.split("|") if cell.strip() != ""]
                     
