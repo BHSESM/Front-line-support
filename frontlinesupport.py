@@ -6,7 +6,7 @@ import re
 # --- 1. UI CONFIGURATION & HIGH-CONTRAST STYLING ---
 st.set_page_config(
     page_title="Service Desk Knowledge Base Engine",
-    layout="centered",
+    layout="wide",  # Widened to support your large job operations tables cleanly
     initial_sidebar_state="collapsed"
 )
 
@@ -35,10 +35,12 @@ st.markdown("""
         color: #00ffcc !important;
         text-align: left !important;
         font-weight: bold !important;
+        font-size: 0.85rem !important;
     }
     div[data-testid="stTable"] td {
         color: #ffffff !important;
         background-color: rgba(255, 255, 255, 0.02) !important;
+        font-size: 0.85rem !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -54,18 +56,20 @@ def load_and_parse_text_kb():
     articles = []
     current_article = None
     
-    # Simple common words to filter out of automatic tag generation
     stop_words = {"the", "and", "a", "of", "to", "in", "is", "for", "on", "with", "as", "by", "at", "an", "this", "that", "from"}
     
     with open(filename, "r", encoding="utf-8") as f:
         for line in f:
-            line_str = line.strip()
+            # Clean up line metadata anchors if present to avoid indexing noise
+            cleaned_line = re.sub(r'\', '', line)
+            line_str = cleaned_line.strip()
+            
             if not line_str:
                 if current_article and current_article["lines"]:
                     current_article["lines"].append("")
                 continue
                 
-            # Updated: A line starting with a hash (#) indicates a new title block
+            # A line starting with a hash (#) indicates a new document segment block
             if line_str.startswith("#"):
                 if current_article:
                     current_article["body_text"] = "\n".join(current_article["lines"])
@@ -73,9 +77,9 @@ def load_and_parse_text_kb():
                 
                 title = line_str.lstrip("# ").strip()
                 
-                # Auto-generate search tags from the title text words directly
-                clean_words = re.sub(r'[^\w\s]', '', title.lower()).split()
-                auto_tags = [w for w in clean_words if w not in stop_words and len(w) > 1]
+                # Auto-generate core lookup parameters from the structural header text
+                clean_title_words = re.sub(r'[^\w\s]', ' ', title.lower()).split()
+                auto_tags = [w for w in clean_title_words if w not in stop_words and len(w) > 1]
                 
                 current_article = {
                     "id": f"TXT-KB-{len(articles) + 1:03d}",
@@ -86,13 +90,15 @@ def load_and_parse_text_kb():
             else:
                 if current_article:
                     current_article["lines"].append(line_str)
-                    # Supplement baseline tags dynamically using content fragments
-                    clean_words = re.sub(r'[^\w\s]', '', line_str.lower()).split()
-                    for w in clean_words:
-                        if w not in stop_words and len(w) > 3 and w not in current_article["tags"]:
+                    
+                    # Supplement index markers dynamically using content row strings
+                    # Dropped limit to length > 2 to catch 3-character operations abbreviations
+                    clean_content_words = re.sub(r'[^\w\s]', ' ', line_str.lower()).split()
+                    for w in clean_content_words:
+                        if w not in stop_words and len(w) > 2 and w not in current_article["tags"]:
                             current_article["tags"].append(w)
                             
-        # Append the final item remaining in buffer
+        # Commit the final remaining buffer segment block safely
         if current_article:
             current_article["body_text"] = "\n".join(current_article["lines"])
             articles.append(current_article)
@@ -101,12 +107,12 @@ def load_and_parse_text_kb():
 
 KNOWLEDGE_BASE = load_and_parse_text_kb()
 
-# --- 3. SEARCH RUNTIME MATCHING LOGIC ---
+# --- 3. ADVANCED SEARCH SCORING ENGINE ---
 def search_knowledge_base(query_string):
     if not query_string.strip() or not KNOWLEDGE_BASE:
         return None, 0
         
-    cleaned_query = re.sub(r'[^\w\s]', '', query_string.lower())
+    cleaned_query = re.sub(r'[^\w\s]', ' ', query_string.lower())
     query_words = cleaned_query.split()
     
     best_match = None
@@ -114,13 +120,19 @@ def search_knowledge_base(query_string):
     
     for article in KNOWLEDGE_BASE:
         score = 0
-        title_clean = re.sub(r'[^\w\s]', '', article["title"].lower())
+        title_clean = re.sub(r'[^\w\s]', ' ', article["title"].lower())
+        body_clean = article["body_text"].lower()
         
         for word in query_words:
+            # Condition 1: Direct matches against structural section titles (Highest weight)
             if word in title_clean:
-                score += 4  # Weight heavily for direct title matches
-            elif word in article["tags"]:
-                score += 2  # Match background tags
+                score += 5
+            # Condition 2: Matches inside dynamic background tag database
+            if word in article["tags"]:
+                score += 3
+            # Condition 3: Deep content fallback scanner (Ensures large table blocks match)
+            if word in body_clean:
+                score += 1
                 
         if score > highest_score:
             highest_score = score
@@ -128,37 +140,61 @@ def search_knowledge_base(query_string):
             
     return best_match, highest_score
 
-# --- 4. STREAMLIT DISPLAY INTERFACE HUB ---
-st.title("🤖 Service Desk Resolution Shield")
-st.write("Instant verification runbook node. Auto-parsing text pipeline active.")
+# --- 4. STREAMLIT INTERFACE HUD DISPLAY LAYER ---
+st.title("🤖 Front-Line Resolution Shield")
+st.write("Instant verification repository module. Search by metrics, status alerts, errors, or job type classifications.")
 
 engineer_query = st.text_input(
     "Describe the issue or enter keywords:", 
-    placeholder="e.g., Wrong job type raised, flashing red light..."
+    placeholder="e.g., Job types, SX1, flashing green light, ALCS, E62..."
 )
 
 if engineer_query:
+    # Lowered threshold limit score slightly to catch wide single keyword hits confidently
     match, match_score = search_knowledge_base(engineer_query)
     
-    if match and match_score >= 3:
+    if match and match_score >= 1:
         st.markdown('<div class="solution-card">', unsafe_allow_html=True)
         st.subheader(f"✅ Best Match Found: {match['title']}")
-        st.caption(f"System Confidence Index Score: {match_score} | Ref ID: {match['id']}")
+        st.caption(f"System Confidence Index Score: {match_score} | Runbook Ref ID: {match['id']}")
         st.divider()
         
-        # Look for pipeline character formatting indicating data rows
-        if "|" in match["body_text"] and ("\n" in match["body_text"] or len(match["body_text"]) > 10):
+        # Table Processing Logic Engine for handling tabular documentation columns layout
+        if "\t" in match["body_text"] or "   " in match["body_text"] or "|" in match["body_text"]:
             try:
                 lines = [l.strip() for l in match["body_text"].split("\n") if l.strip()]
                 table_matrix = []
+                
+                # Determine structural matrix column character separator rules dynamically
                 for l in lines:
-                    table_matrix.append([cell.strip() for cell in l.split("|")])
+                    if "\t" in l:
+                        row_cells = [cell.strip() for cell in l.split("\t") if cell.strip() != ""]
+                    elif "   " in l:
+                        row_cells = [cell.strip() for cell in re.split(r'\s{2,}', l) if cell.strip() != ""]
+                    else:
+                        row_cells = [cell.strip() for cell in l.split("|") if cell.strip() != ""]
                     
-                if table_matrix:
+                    if row_cells:
+                        table_matrix.append(row_cells)
+                
+                if table_matrix and len(table_matrix) > 1:
                     headers = table_matrix[0]
                     rows = table_matrix[1:]
-                    formatted_df = pd.DataFrame(rows, columns=headers)
+                    
+                    # Normalize row matrix arrays width frames if strings drop layout mismatches
+                    max_cols = len(headers)
+                    normalized_rows = []
+                    for r in rows:
+                        if len(r) < max_cols:
+                            r = r + [""] * (max_cols - len(r))
+                        elif len(r) > max_cols:
+                            r = r[:max_cols]
+                        normalized_rows.append(r)
+                        
+                    formatted_df = pd.DataFrame(normalized_rows, columns=headers)
                     st.table(formatted_df)
+                else:
+                    st.markdown(match["body_text"])
             except Exception:
                 st.markdown(match["body_text"])
         else:
@@ -175,4 +211,4 @@ if engineer_query:
         """, unsafe_allow_html=True)
 
 st.divider()
-st.caption("Shinra ITSM Shield Layer v1.2 — 100% Verified Local Runbook Registry")
+st.caption("Shinra ITSM Shield Layer v1.3 — 100% Verified Local Runbook Registry")
