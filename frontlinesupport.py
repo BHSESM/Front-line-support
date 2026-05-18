@@ -45,7 +45,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. AUTOMATED PLAIN TEXT PARSER & AUTO-TAGGER (HARD RESET VERSION) ---
+# --- 2. AUTOMATED PLAIN TEXT PARSER & AUTO-TAGGER ---
 @st.cache_data
 def fetch_and_compile_text_runbooks():
     filename = "knowledge_base.txt"
@@ -55,17 +55,19 @@ def fetch_and_compile_text_runbooks():
         
     articles = []
     current_article = None
-    
     stop_words = {"the", "and", "a", "of", "to", "in", "is", "for", "on", "with", "as", "by", "at", "an", "this", "that", "from"}
     
     with open(filename, "r", encoding="utf-8") as f:
         for raw_line in f:
-            # Clean out "" anchors purely via string splitting to bypass Python 3.14 regex restrictions entirely
-            if "")
-                line_str = "".join([p for p in parts if ").strip()
-            else:
-                line_str = raw_line.strip()
-            
+            # FIX: Clean out tags using explicit loops instead of risky list comprehensions
+            line_str = raw_line.strip()
+            if "", start_idx)
+                    if end_idx != -1:
+                        line_str = line_str[:start_idx] + line_str[end_idx+1:]
+                    else:
+                        break
+                line_str = line_str.strip()
+
             if not line_str:
                 if current_article and current_article["lines"]:
                     current_article["lines"].append("")
@@ -78,7 +80,6 @@ def fetch_and_compile_text_runbooks():
                 
                 title = line_str.lstrip("# ").strip()
                 
-                # Manual character stripping to eliminate regex engine constraints completely
                 clean_title = title.lower()
                 for char in [".", ",", "-", "/", "(", ")", "!", "?", ":", ";"]:
                     clean_title = clean_title.replace(char, " ")
@@ -212,4 +213,4 @@ if engineer_query:
         """, unsafe_allow_html=True)
 
 st.divider()
-st.caption("Shinra ITSM Shield Layer v1.6 — 100% Verified Local Runbook Registry")
+st.caption("Shinra ITSM Shield Layer v1.7 — 100% Verified Local Runbook Registry")
