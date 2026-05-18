@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import os
-import re
 
 # --- 1. UI CONFIGURATION & HIGH-CONTRAST STYLING ---
 st.set_page_config(
@@ -45,76 +43,314 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. AUTOMATED PLAIN TEXT PARSER & AUTO-TAGGER ---
+# --- 2. SELF-CONTAINED RAW TEXT DATABASE ENGINE ---
+RAW_TEXT_DATABASE = """
+# ALCS Jobs Vs. Non-ALCS Jobs Raised Incorrectly
+In the event an electric job is raised incorrectly in regards to ALCS (5 Terminal usage), please see chart below and how to proceed:
+
+Job Raised | What Property Needs | How to Proceed
+Electric Single Element (No ALCS) | ALCS (5 Terminal) Needed | Must abort with code from TL for wrong job type raised.
+Electric 3PH (No ALCS) | ALCS (5 Terminal) Needed | Must abort with code from TL for wrong job type raised.
+Electric Single Element ALCS | 5 Terminal NOT Needed | Fit 5T, bung the 5th. Job can still be completed.
+Electric 3PH ALCS | 5 Terminal NOT Needed | Fit 5T, bung the 5th. Job can still be completed.
+
+# Whitelisted / Installed-Not-Commissioned / Commissioned Assets
+Asset Status & Management (HVA)
+During commissioning, assets typically move through three stages on the HVA. Understanding these helps determine if an asset can be "saved" or if it needs to be exchanged.
+
+The Three Asset States:
+Whitelisted: The asset was included in a submission but failed to join the HAN.
+Installed Not Commissioned: The asset has successfully joined the HAN but has not completed the key commissioning steps.
+Commissioned: The asset has joined the HAN and finished all commissioning steps.
+⚠️ IMPORTANT: Achieving "Commissioned" status is NOT valid grounds to leave the site early on Pre-Pay (PP) Warrant work.
+
+Job-Specific Logic (SX1 & INV):
+- SX1 Work (Smart to Smart / S2S)
+If the asset appears on the HVA (regardless of its status), you must attempt the job as Smart to Smart (S2S) first. Only send the job as Dumb to Smart if the system presents an explicit error.
+
+- INV Work (Investigation)
+Before working on any other assets, CHUB communication must be confirmed. If the Hub isn't talking, do not attempt commissioning or exchanges.
+
+-  The "Devices to Remain" Logic: For Whitelisted or Installed Not Commissioned assets:
+Add the assets to the "Devices to Remain" worksheet. Do not complete the confirmations yet; attempt a HHT submission first. The system will perform an MF lookup. If valid, it will either: Open the HAN to allow the engineer to join the device, or automatically move the asset to Commissioned without engineer interaction. If this logic fails, then a physical exchange can be considered.
+
+# Uncategorized Retry Error
+Uncategorized Retry Error: If you receive this error when completing a retry post-ANR, check two things before committing to an Install & Leave:
+GUID: Is the scanned GUID the same as the one the ANR was generated for?
+Asset Type: Is the retry for the correct asset?
+If "No" to either: A MEX is likely required for the ANR asset.
+If "Yes" to both: You may proceed with Install & Leave.
+
+# Alert Not Received (ANR) Information and Response Diagram
+If an Alert Not Received (ANR) occurs during commissioning, it is VITAL to understand what has alerted and how to resolve the alert.
+
+Basics:
+1. Alerts can occur for Electric meter (ESME), Gas meter (GSME), or In Home Display/IHD (PPMID).
+2. Engineers can ONLY see the First Alert. If multiple Alerts occur, Engineer MUST RESPOND to ALL ALERTS or will NOT go Comp Full. Smart Support should aid the engineer to make sure all Alerts are responded to correctly, and within a reasonable time-frame. This includes checking to see if meter(s)/IHD has re-alerted after initial ANR Response(s) sent. Occurs within 20 min of responding to all original alerts.
+3. BEFORE Responding to Alerts, check if HAN has joined. This will determine how to respond. Is HAN bar/icon showing on meter? Does the IHD show the correct date/time? Has the engineer included pictures in worksheets, to show meter/IHD has joined?
+4. If ESME/GSME Alerts BEFORE Comp-Removal-Comp during S2S exchange, Check XML to see if Removal Meter guid included in XML submission (not just worksheets). If Removal Guid NOT included in XML- Advise Engineer to get new Meter on the wall ASAP and call back to respond to Alert. MUST HAVE NEW METER IN PLACE TO RESPOND.
+5. If Meter/IHD Alerts during CHUB Swap- If job requires meter exchange (SX1 job) for specified meter that has alerted- respond with "Suspect Device" and wait for fail. Once fail comes back, treat CHUB swap as comp full and advise eng to continue with Meter exchange as S2S, with "Suspected" meter guid in Removal worksheet. If IHD Alerts during CHUB swap, Send "Suspect Device" for IHD and wait for fail to come back. Once fail comes back, treat CHUB swap as comp full and advise eng to continue with Meter exchange with new IHD to install. No IHD Removal worksheet needs to be filled in. IHDs auto-replace themselves.
+6. If Meter/IHD Alerts during Investigation Job (INV job) and alerted Asset has NOT Joined- Send "Retry" Response and attempt to join asset manually, if possible.
+
+# LED Sequences for Communication Hubs
+Below is the LED Light sequencing guide for Smets 2 Communication Hubs (CHUBS):
+
+Flashing Type | Light Duration (ON) | Pause Duration (OFF) | What it means
+High Frequency (HFF) | 0.1 Seconds | 0.5 Seconds | Error: Action required
+Medium Frequency (MFF) | 0.1 Seconds | 2.0 Seconds | Transition: System is updating/changing
+Low Frequency (LFF) | 0.1 Seconds | 5.0 Seconds | Normal: System is running correctly
+
+📶 HAN (Home Area Network) Status Guide
+LED Behavior | What is Happening? | How Long? | What to Do?
+No Light | Power Off / Hub not working | Permanent | Check power. If it's on but no light, the Hub needs replacing.
+Flashing RED (Medium) | Starting Up (Normal) | Max 60 secs | Wait. If it takes longer than a minute, reset the Hub.
+Solid RED | Device Joined (Success!) | 5 Seconds | Nothing—it’s just confirming the device is connected.
+Flashing RED (High) | Join Failed (Error) | 5 Seconds | Try adding the device to the log again and retry pairing.
+Solid GREEN | Ready but no devices found | Ongoing | Follow the steps to add/pair your smart devices.
+Flashing GREEN (Medium) | Pairing Mode (Normal) | Up to 60 mins | Start the "pairing" process on your smart device now.
+Flashing GREEN (Low) | All Good (Normal) | Final State | Nothing—the system is working perfectly.
+Flashing GREEN (High) | System Error | Max 5 secs | It should reboot itself. If not, perform a manual reset.
+
+🌐 WAN (Wide Area Network) Status Guide
+This LED tells you if the Hub is successfully talking to the national network.
+LED Behavior | What is happening? | How long? | What to do Next?
+Flashing GREEN (Medium) | Connecting... | Up to 5 mins | Wait for connection. If it takes longer, the area might have poor signal (No WAN coverage).
+Flashing GREEN (Low) | Connected (Normal) | Permanent | Nothing—this is the correct "Final" state.
+Flashing GREEN (Medium) | Disconnected (Signal Lost) | Until fixed | The Hub is trying to reconnect. If it stays like this, an Incident Record needs to be updated.
+Flashing GREEN (High) | Network Error | Max 5 secs | The Hub should reboot itself. If it gets stuck, perform a manual reset or replace the Hub.
+
+# E62 Error: SMETS1 Assets
+This is usually caused by a SMETS1 asset being scanned as Smart (Remain/Remove/Install) rather than being treated as a Dumb asset.
+If HAN fails to open: Remove the GUID for the SMETS1 asset(s), change the type to DUMB/SMETS1, and resend.
+If HAN opened/joined: Use a Staged Install. Move joined assets to "Remain" (away from "To Install") and resend the rest.
+Crucial: You must remove the GUID and change the type to DUMB/SMETS1; only setting to DUMB/SMETS1 will not work.
+
+# Worksheets Required for Smart Jobs- Manually Adding
+📝 Manually Adding Worksheets
+If internal/system issues mean worksheets are missing from Job Watch:
+Open the job and navigate to "Worksheets" (right-hand side). Use the drop-down to manually add the following:
+HHT 5 UAT | HHT6 | Site visit | Meter info | Confirmations | IHD
+
+# Emergency (ECO) Job Basics & Hot Shoe
+Based on December 2025 Update to Commissioning Processes, the following information should be used when handling emergency jobs.
+Emergency (ECO) Jobs - General Requirements
+- All ECO jobs MUST be completed using a Smart meter and Communications Hub (CHUB)
+- SP Policy requires that Customer are NOT left vulnerable (no supply / no heating / no hot water).
+- If the Engineer CANNOT replace equipment, due to lack of stock, this MUST be escalated to the Line Manager or Out of Hours (OOH) Manager for support.
+
+Gas Emergency - Hot Shoe Requirements
+A Hot Shoe MUST be installed unless one of the following applies:
+            - No Live Electric Supply -> Install & Leave
+            - No Access to the Electricity Service Position -> Install & Leave code from Team Leader (TL) or OOH Manager with photographic evidence
+            - Inadequate Space for Hot Shoe -> Install & Leave code from Team Leader (TL) or OOH Manager with photographic evidence
+
+Customer Refusal to Power Down
+- There is NO AGREEMENT allowing customer refusal to power down when a Hot Shoe is required.
+- If the Customer REFUSES to Power Down, the Engineer MUST escalate to Dispatch/OOH team.
+*** The three (3) reasons listed above are the ONLY VALID REASONS for NOT installing a Hot Shoe on emergency jobs.
+
+# 3PH ALCS and Economy 2000 Installation Policy (2026)
+🛠️ Installation Policy & Exceptions (Dec 2025 Update)
+As of December 2025, the standard policy is Install & Leave or Install, Join & Leave. However, two specific job types are NON-ELIGIBLE for this and must be fully commissioned BEFORE an engineer leaves the site. Below is information about how to Identify and handle 3PH ALCS and Economy 2000 (ECO 2000) jobs.
+
+🚫 The "Non-Eligible" Exceptions
+If the job is one of the following, you MUST receive a COMP-FULL status.
+Job Type | How to Identify | Mandatory Action
+ECO 2000 | Check the heating type. It won't be on the job card. Look for "Group Code 20" sticker on the RTS or old meter photos. If Group Code sticker missing number, check Campaign ID under Customer Details page on jobcard or on Enduring. | Must achieve COMP-FULL. Give up to 60 minutes for COMP-FULL to be received. - If it fails, you must abort the job.
+3PH ALCS | Check the Job Details. Identified by the specific sub-job type code. | Must achieve COMP-FULL. Give up to 60 minutes for COMP-FULL to be received. - If it fails, you must abort the job.
+
+⚠️ Failure to Commission (The Abort Process)
+If a COMP-FULL status IS NOT achieved for the two job types specified above, you CANNOT leave the job "Pending." You must follow the Abort Protocol:
+Abort the Job: Trigger a "Drop Elec" or "Drop Dual Fuel" status. If no fail in over 60 minutes, will not have option to "Drop fuel."
+Clear Worksheets: All worksheets must be emptied/cleared.
+Reinstall Old Meter(s): All old metering must go back on the wall.
+Do Not Leave: Under no circumstances should these be left as "Install & Leave" if commissioning fails.
+
+# Rules for 1PH and 3PH Jobs Booked Incorrectly
+If a 1PH (single phase) or 3PH (3 phase) job is booked in but it is determined to be raised incorrectly (ie. raised as 1PH but 3PH on site, etc) the information below can be used to determine if the job can go ahead.
+1PH booked but 3PH on site -> Eligible to complete, subject to skill-set of engineer and eligible for install & leave, subject to standard commissioning policy/validation
+3PH booked but 1PH on site -> Eligible to complete and eligible for install & leave, subject to standard commissioning policy/validation
+1PH ALCS but 3PH ALCS to be installed -> Eligible to complete, subject to skill-set of engineer but should it fail to commission - it must be an abort
+3PH ALCS but 1PH ALCS to be installed -> Eligible to complete and eligible for install & leave, subject to standard commissioning policy/validation
+
+Additional Notes:
+- If ALCS job raised, but NO ALCS required, fit 5T (5 Terminal), bung the 5th terminal
+- If Non-ALCS job raised but ALCS required- job must be aborted with code from TL for wrong job type raised
+
+# Band Join Confirmation for EDMI E6 Gas Meter - HAN Join
+Below are the instructions to access the "Band Join Confirmation Page" on an EDMI E6 gas meter (GSME)
+      - Band Join confirmation shows the meter HAS joined HAN.
+      - Use if engineer needs proof to show EDMI E6 gas meter has joined, but is unable to include a picture of the "HAN Setup Complete," "Commissioning Waiting," or of commissioning stages.
+Steps to access Band Join Confirmation Page:
+      1. Press and hold the button on the Right Hand Side (RHS) to get display to show
+      2. Press and hold RHS button again to access menus
+      3. Press RHS button to scroll across menus
+      4. Once the Engineer reaches the INFO page -> Press and hold RHS button to access NEW MENU
+      5. Scroll until engineer gets to HAN
+      6. Press and hold RHS button to access BAND JOIN CONFIRMATION page
+      7. Take picture of screen showing BAND with Hertz (Hz), add to worksheet
+                  - Dual Band (DB): 868 MHz
+                  - Single Band (SB): 2.4 GHz
+
+# L&G 4T - "IST"
+L&G 4T ESME – “IST” Display During Power-On or Commissioning
+If, during power-on or commissioning of an L&G 4T ESME, the meter display shows “IST”, this indicates the Initial Self Test mode.
+This screen is not an error and does not require any engineer intervention unless they specifically wish to complete the self-tests. It is a standard manufacturer option designed for diagnostic purposes.
+Action: The “IST” prompt can be safely ignored.
+Purpose: The meter will proceed normally once bypassed, and this does not impact functionality, safety, or commissioning results.
+If the engineer wishes to progress the meter to display the initial meter readings instead:
+Press the “A” button repeatedly to cycle through the display screens.
+When prompted, press the “B” button to confirm and exit the self-test sequence.
+The meter will then continue through its normal startup and display the initial readings ready for commissioning.
+
+# L&G (Landis Gyr) SMETS2 ESME Manual join process
+Should the meter fail to self join, prior to ANR or after a retry has been completed, the below steps allow for a manual join on L&G SMETS2 ESME
+1. The meter should automatically show “RateXXActImp 00000kWh”. If it doesn’t press the A button.
+2. Press the A button twice until the screen shows “Credit Mode Bal.’
+3. Hold B until “Manage Pin? A=No B=Yes” shows
+4. Keep pressing the A button until the screen shows “Han? A=No B=Yes”
+5. Press B for yes and the screen should show “RejoinHAN? A=No B=Yes”
+6. Press B again to join - the screen should say “HanJoining” for about 15 seconds. The screen will then show “Han Join OK”
+⚠️ Critical Fallbacks:
+1. If the screen shows with “Han Join OK” for a second before going back to “Manage Pin” then the meter has not joined - you will need to do the steps again.
+2. Additionally if the meter says “HAN Join Failed” then you also need to repeat the steps.
+
+# Dual Band & Single band frequency for join
+Overview:
+Dual Band Communications Hubs (DBCH) support two frequencies for the Home Area Network (HAN): 2.4GHz and 868MHz. When commissioning a GSME (gas meter) to a DBCH, engineers will be prompted to select the desired frequency during the pairing process.
+Engineer Guidance:
+- Use 2.4GHz (Single Band) when: The GSME is within 7 meters of the communications hub and there are no known obstructions, such as thick walls or complex building layouts.
+- Use 868MHz (Dual Band) when: The GSME is more than 7 meters from the hub or there are potential obstructions (e.g., walls, staircases, or structural materials) that may impact signal strength.
+Additional Notes:
+1. Always assess the installation environment before selecting the frequency. Choosing the appropriate band ensures reliable HAN performance and reduces the risk of commissioning failure.
+2. Sku2 + Aerial (South) and 420 DB (North) Communication Hubs (CHUB) should be used if Dual Band is required, until stock runs out. If engineer has none of the aforementioned stock, engineer must use 4G CHUB (available for use in North and South).
+
+# Multiple requests
+Handling the "Multiple Requests May Cause Issues – Please Wait" Error
+An engineer may encounter the message "Multiple requests may cause issues – please wait" for a variety of reasons. It’s crucial to take a holistic view of the situation before deciding on any next steps.
+Step 1: Check if HAN has opened
+If HAN has opened: This error can usually be safely ignored. Proceed with the standard process. The error is often triggered by signal-related issues, where multiple HHTSTART requests are received by the MF in quick succession.
+Step 2: If HAN has not opened – check common causes
+Is the MFID valid? Is the WAN set to TRUE? If both of the above are in order, it's recommended to wait up to 20 minutes, as the system may still be in a pending state, awaiting a DCCF response—particularly for scenarios involving E20/E21.
+Step 3: Review When the Error Occurred
+- If the error occurred at the initial submission: All of the above checks apply.
+- If the error was received during “OUTS” or after “Confirm Completion”: Further investigation is required. If received during OUTS, this may indicate it was sent incorrectly. In this case, perform a PLR and resend. If Confirm Completion was sent after receiving COMP-FULL, the job is likely complete and should be closed according to standard policy.
+- If the error occurs after an ANR (e.g., ALERT-ESME, GSME, or PPMID): This likely means the ANR has suppressed the alert, and as a result, an Install & Leave should be issued. Be aware that this will fail ECR and will be non-payable. Exception: If the engineer previously received a "CHOOSE ACTION" prompt (e.g., for PPMIDOK), a PLR may be performed. In this case, use the CHOOSE ACTION to complete “Respond to alert not received” and proceed accordingly.
+
+# MSN GUID Not live
+⚠️ Issue: If an engineer receives the error, it indicates a failure within the pre-payment commissioning process (not a stock issue), and the job must be aborted.
+🔧 Important Actions to Take:
+🔄 Engineer Resolution: The engineer must select Choose resolution and send Drop "Elec/Gas" as appropriate.
+📝 Empty the Worksheet(s): Ensure that the worksheet(s) are emptied of any new meter details. If it is a full abort, the CHUB worksheet must also be emptied.
+⚠️ Partial Abort (Gas Only): If it is a partial abort on gas and the engineer wishes to send an IHD, wait for the "COMP-PART" response from the drop fuel submission. Once "COMP-PART" is received on HHT, the engineer can proceed with the IHD. By following these steps, the engineer can effectively handle the pre-payment commissioning failure and ensure the job is properly aborted.
+
+# Job type is for a complex meter scenario
+🚨 This typically indicates that the job is a Twin Element (2E) install, but the required Twin Element meter has not been fitted.
+Resolution Steps:
+✅ Ensure the correct meter is installed – The required model is Aclara SGM 1422-B.
+✅ Replace the incorrect meter with the Aclara SGM 1422-B.
+✅ Resubmit the HHT submission after installation.
+
+# Twin element balance issues
+When filling out the job card- will request a BALANCE for both the First MPAN AND the Secondary MPAN/Meter. However, this will result is Job Watch DOUBLING the balance, which we DO NOT WANT.
+As a work around, for Pre-Payment Twin Element: the engineer SHOULD set the first MPAN as the Correct Balance and the Secondary MPAN as £0 Balance. If there is an ERROR received (will show as Parse Fail in HHT5) - Set Secondary Meter to Credit.
+
+# Enable supply on SMETS2 ESME
+Aclara electricity meter
+How to identify: The meter’s serial number begins with two digits then M. It has two buttons labelled A and B. Ensure your meter is topped up with a credit balance of at least £1. Once you’ve topped up, the relay will start to flash and a reconnection message will appear. Press and hold buttons (A) and (B) together and the supply will connect.
+
+Honeywell electricity meter
+How to identify: The meter’s serial number begins with two digits, then K or L. It has two buttons (upper and lower button). Ensure your meter is topped up with a credit balance of at least £1. Press the lower button to illuminate the display screen. Navigate using the lower button until SUPPLY is displayed. Press the upper button to select. SUPPLY STATE ARMED message will be displayed. Hold the upper and lower together until the meter makes a clicking noise. SUPPLY STATE ENABLED will be displayed and your supply will be switched back on.
+
+EDMI electricity meter
+How to identify: The meter’s serial number begins with two digits, then E. It has two buttons. Holding down the right button for 1 second acts as an ‘OK’ function. Ensure your meter is topped up with a positive balance of at least £1. Press and hold the (OK) button to enter the main menu. Press and hold the (OK) button on the main Prepay screen. Press the (OK) button to scroll through the menu until you reach Info—Supply. Then press and hold the (OK) button to enter. Press and hold the (OK) button to restore your supply.
+
+# Enable supply on SMETS2 GSME
+See below process as discussed, to try and re-enable supply on a EDMI GSME before we consider a replacement:
+Top up with credit -> Turn off all your gas appliances -> Press and hold OK button to wake meter up -> Screen shows as ‘supply disabled’ -> Press OK -> Screen shows ‘Supply: Armed’ press OK -> Screen shows ‘enable’ press OK -> Screen should then show ‘enabled’ and valve will open -> Wait for 2-3 minutes until you turn any appliances on.
+
+If you have an Aclara/Uniflo - You can try:
+Press any button on the front screen to turn on the meter display. Press button A and ‘Safe open sequence’ will appear on the screen. The display will then show a series of messages and countdowns as the supply is reconnected. It will then return to the main screen and the gas supply should now be reconnected. For safety, if the meter detects any gas flowing while turning back on it will turn itself off again until the flow is stopped. If this happens, please check all gas appliances to make sure there's nothing left on then try again from the start.
+
+If you have a Honeywell gas meter - You can try:
+Wake the gas meter by pressing the middle button. Ensure your meter is topped up with a credit balance of at least £1. Turn off your boiler and all other gas appliances in the property before trying to restore your gas supply. Hold the middle button to restore your supply. The meter will then conduct a gas flow check. This is to ensure there’s no excess flow of gas (in the case of gas leaks or appliances left on). If the gas flow is deemed to be excessive, the valve will close and you will remain off supply. Don't switch gas appliances on whilst the gas flow check is in progress. If the valve remains or reverts back to closed, check all gas appliances to confirm they’re off and reattempt re-enabling the supply.
+
+# SWAP device
+Procedure for Handling a Suspect Device and Swapping in a New Asset
+🔍 Complete Suspect Device Process:
+Suspect Device: After determining the device is faulty, complete the "Suspect Device" process.
+Confirmation: Ensure that the “<asset> fail” response is received from Meter Flow, indicating the failure of the suspect device.
+🔄 Initiate Device Swap:
+Choose Resolution: On HHT5, select "Choose resolution" and then "SWAP device."
+Device Details: Device to Swap Out: Enter the GUID of the device that was identified as faulty. Device to Swap In: Enter the GUID of the new device that you intend to commission.
+🚀 Commission the Swap:
+Send Commission: Submit the swap device request. You should receive a "Command Verified" response indicating that the commission is in progress.
+Wait for Response: Expect to receive "COMP-REMOVAL COMP" within a few minutes (typically around 5 minutes).
+🔧 Finalize Device Installation:
+Confirm Removal: Once "COMP-REMOVAL COMP" is received, submit "Confirm device removal-temp" at the bottom of HHT5.
+Open HAN: This will initiate HAN for the new device, allowing it to connect.
+⚠️ Important: Ensure the new meter worksheets reflect the newly installed meter and not the original attempted meter. Failure to do this will result in a non-payable job.​
+"""
+
+# --- 3. DYNAMIC PARSER CORE ENGINE ---
 @st.cache_data
-def fetch_and_compile_text_runbooks():
-    filename = "knowledge_base.txt"
-    if not os.path.exists(filename):
-        st.error("Missing infrastructure file: 'knowledge_base.txt' not found in repository root.")
-        return []
-        
+def compile_embedded_runbooks():
     articles = []
     current_article = None
     stop_words = {"the", "and", "a", "of", "to", "in", "is", "for", "on", "with", "as", "by", "at", "an", "this", "that", "from"}
     
-    with open(filename, "r", encoding="utf-8") as f:
-        for raw_line in f:
-            # FIX: Clean out tags using explicit loops instead of risky list comprehensions
-            line_str = raw_line.strip()
-            if "", start_idx)
-                    if end_idx != -1:
-                        line_str = line_str[:start_idx] + line_str[end_idx+1:]
-                    else:
-                        break
-                line_str = line_str.strip()
-
-            if not line_str:
-                if current_article and current_article["lines"]:
-                    current_article["lines"].append("")
-                continue
-                
-            if line_str.startswith("#"):
-                if current_article:
-                    current_article["body_text"] = "\n".join(current_article["lines"])
-                    articles.append(current_article)
-                
-                title = line_str.lstrip("# ").strip()
-                
-                clean_title = title.lower()
-                for char in [".", ",", "-", "/", "(", ")", "!", "?", ":", ";"]:
-                    clean_title = clean_title.replace(char, " ")
-                clean_title_words = clean_title.split()
-                
-                auto_tags = [w for w in clean_title_words if w not in stop_words and len(w) > 1]
-                
-                current_article = {
-                    "id": f"TXT-KB-{len(articles) + 1:03d}",
-                    "title": title,
-                    "tags": auto_tags,
-                    "lines": []
-                }
-            else:
-                if current_article:
-                    current_article["lines"].append(line_str)
-                    
-                    clean_content = line_str.lower()
-                    for char in [".", ",", "-", "/", "(", ")", "!", "?", ":", ";", "|"]:
-                        clean_content = clean_content.replace(char, " ")
-                    clean_content_words = clean_content.split()
-                    
-                    for w in clean_content_words:
-                        if w not in stop_words and len(w) > 2 and w not in current_article["tags"]:
-                            current_article["tags"].append(w)
-                            
-        if current_article:
-            current_article["body_text"] = "\n".join(current_article["lines"])
-            articles.append(current_article)
+    lines = RAW_TEXT_DATABASE.strip().split("\n")
+    
+    for raw_line in lines:
+        line_str = raw_line.strip()
+        
+        if not line_str:
+            if current_article and current_article["lines"]:
+                current_article["lines"].append("")
+            continue
             
+        if line_str.startswith("#"):
+            if current_article:
+                current_article["body_text"] = "\n".join(current_article["lines"])
+                articles.append(current_article)
+            
+            title = line_str.lstrip("# ").strip()
+            
+            clean_title = title.lower()
+            for char in [".", ",", "-", "/", "(", ")", "!", "?", ":", ";"]:
+                clean_title = clean_title.replace(char, " ")
+            clean_title_words = clean_title.split()
+            
+            auto_tags = [w for w in clean_title_words if w not in stop_words and len(w) > 1]
+            
+            current_article = {
+                "id": f"EMB-KB-{len(articles) + 1:03d}",
+                "title": title,
+                "tags": auto_tags,
+                "lines": []
+            }
+        else:
+            if current_article:
+                current_article["lines"].append(line_str)
+                
+                clean_content = line_str.lower()
+                for char in [".", ",", "-", "/", "(", ")", "!", "?", ":", ";", "|"]:
+                    clean_content = clean_content.replace(char, " ")
+                clean_content_words = clean_content.split()
+                
+                for w in clean_content_words:
+                    if w not in stop_words and len(w) > 2 and w not in current_article["tags"]:
+                        current_article["tags"].append(w)
+                        
+    if current_article:
+        current_article["body_text"] = "\n".join(current_article["lines"])
+        articles.append(current_article)
+        
     return articles
 
-KNOWLEDGE_BASE = fetch_and_compile_text_runbooks()
+KNOWLEDGE_BASE = compile_embedded_runbooks()
 
-# --- 3. ADVANCED SEARCH SCORING ENGINE ---
+# --- 4. ADVANCED SCORING SEARCH RUNTIME ---
 def search_knowledge_base(query_string):
     if not query_string.strip() or not KNOWLEDGE_BASE:
         return None, 0
@@ -146,9 +382,9 @@ def search_knowledge_base(query_string):
             
     return best_match, highest_score
 
-# --- 4. STREAMLIT INTERFACE HUD DISPLAY LAYER ---
+# --- 5. INTERFACE HUB DISPLAY ---
 st.title("🤖 Front-Line Resolution Shield")
-st.write("Instant verification repository module. Search by metrics, status alerts, errors, or job type classifications.")
+st.write("Instant verification repository node. Internal database matrix fully self-contained.")
 
 engineer_query = st.text_input(
     "Describe the issue or enter keywords:", 
@@ -213,4 +449,4 @@ if engineer_query:
         """, unsafe_allow_html=True)
 
 st.divider()
-st.caption("Shinra ITSM Shield Layer v1.7 — 100% Verified Local Runbook Registry")
+st.caption("Shinra ITSM Shield Layer v1.7 — Self-Contained Deployment Production Release")
