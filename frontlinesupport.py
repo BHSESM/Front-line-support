@@ -18,7 +18,7 @@ st.markdown("""
         border: 1px solid rgba(0, 255, 204, 0.3);
         border-radius: 12px;
         padding: 25px;
-        margin-top: 25px;
+        margin-top: 20px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
     h1, h2, h3, h4, h5, h6, p, span, label, li {
@@ -350,18 +350,17 @@ def compile_embedded_runbooks():
 
 KNOWLEDGE_BASE = compile_embedded_runbooks()
 
-# --- 4. ADVANCED SCORING SEARCH RUNTIME ---
-def search_knowledge_base(query_string):
+# --- 4. ADVANCED SCORING SEARCH RUNTIME (MULTI-MATCH ENGINE) ---
+def search_knowledge_base_multi(query_string):
     if not query_string.strip() or not KNOWLEDGE_BASE:
-        return None, 0
+        return []
         
     cleaned_query = query_string.lower()
     for char in [".", ",", "-", "/", "(", ")", "!", "?", ":", ";"]:
         cleaned_query = cleaned_query.replace(char, " ")
     query_words = cleaned_query.split()
     
-    best_match = None
-    highest_score = 0
+    matched_results = []
     
     for article in KNOWLEDGE_BASE:
         score = 0
@@ -376,11 +375,13 @@ def search_knowledge_base(query_string):
             if word in body_clean:
                 score += 1
                 
-        if score > highest_score:
-            highest_score = score
-            best_match = article
+        # Only include if there is an actual positive match score
+        if score >= 1:
+            matched_results.append((article, score))
             
-    return best_match, highest_score
+    # Sort results highest score first
+    matched_results.sort(key=lambda x: x[1], reverse=True)
+    return matched_results
 
 # --- 5. INTERFACE HUB DISPLAY ---
 st.title("🤖 Front-Line Resolution Shield")
@@ -392,53 +393,56 @@ engineer_query = st.text_input(
 )
 
 if engineer_query:
-    match, match_score = search_knowledge_base(engineer_query)
+    results = search_knowledge_base_multi(engineer_query)
     
-    if match and match_score >= 1:
-        st.markdown('<div class="solution-card">', unsafe_allow_html=True)
-        st.subheader(f"✅ Best Match Found: {match['title']}")
-        st.caption(f"System Confidence Index Score: {match_score} | Runbook Ref ID: {match['id']}")
-        st.divider()
+    if results:
+        st.write(f"### Found {len(results)} relevant matching runbook paths:")
         
-        if "\t" in match["body_text"] or "   " in match["body_text"] or "|" in match["body_text"]:
-            try:
-                lines = [l.strip() for l in match["body_text"].split("\n") if l.strip()]
-                table_matrix = []
-                
-                for l in lines:
-                    if "\t" in l:
-                        row_cells = [cell.strip() for cell in l.split("\t") if cell.strip() != ""]
-                    elif "   " in l:
-                        row_cells = [cell.strip() for cell in l.split("   ") if cell.strip() != ""]
-                    else:
-                        row_cells = [cell.strip() for cell in l.split("|") if cell.strip() != ""]
-                    
-                    if row_cells:
-                        table_matrix.append(row_cells)
-                
-                if table_matrix and len(table_matrix) > 1:
-                    headers = table_matrix[0]
-                    rows = table_matrix[1:]
-                    
-                    max_cols = len(headers)
-                    normalized_rows = []
-                    for r in rows:
-                        if len(r) < max_cols:
-                            r = r + [""] * (max_cols - len(r))
-                        elif len(r) > max_cols:
-                            r = r[:max_cols]
-                        normalized_rows.append(r)
-                        
-                    formatted_df = pd.DataFrame(normalized_rows, columns=headers)
-                    st.table(formatted_df)
-                else:
-                    st.markdown(match["body_text"])
-            except Exception:
-                st.markdown(match["body_text"])
-        else:
-            st.markdown(match["body_text"])
+        for match, match_score in results:
+            st.markdown('<div class="solution-card">', unsafe_allow_html=True)
+            st.subheader(f"✅ Runbook Title: {match['title']}")
+            st.caption(f"System Confidence Index Score: {match_score} | Runbook Ref ID: {match['id']}")
+            st.divider()
             
-        st.markdown('</div>', unsafe_allow_html=True)
+            if "\t" in match["body_text"] or "   " in match["body_text"] or "|" in match["body_text"]:
+                try:
+                    lines = [l.strip() for l in match["body_text"].split("\n") if l.strip()]
+                    table_matrix = []
+                    
+                    for l in lines:
+                        if "\t" in l:
+                            row_cells = [cell.strip() for cell in l.split("\t") if cell.strip() != ""]
+                        elif "   " in l:
+                            row_cells = [cell.strip() for cell in l.split("   ") if cell.strip() != ""]
+                        else:
+                            row_cells = [cell.strip() for cell in l.split("|") if cell.strip() != ""]
+                        
+                        if row_cells:
+                            table_matrix.append(row_cells)
+                    
+                    if table_matrix and len(table_matrix) > 1:
+                        headers = table_matrix[0]
+                        rows = table_matrix[1:]
+                        
+                        max_cols = len(headers)
+                        normalized_rows = []
+                        for r in rows:
+                            if len(r) < max_cols:
+                                r = r + [""] * (max_cols - len(r))
+                            elif len(r) > max_cols:
+                                r = r[:max_cols]
+                            normalized_rows.append(r)
+                            
+                        formatted_df = pd.DataFrame(normalized_rows, columns=headers)
+                        st.table(formatted_df)
+                    else:
+                        st.markdown(match["body_text"])
+                except Exception:
+                    st.markdown(match["body_text"])
+            else:
+                st.markdown(match["body_text"])
+                
+            st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.error("❌ No matching resolution path located inside local database frames.")
         st.markdown("""
@@ -449,4 +453,4 @@ if engineer_query:
         """, unsafe_allow_html=True)
 
 st.divider()
-st.caption("Shinra ITSM Shield Layer v1.7 — Self-Contained Deployment Production Release")
+st.caption("Shinra ITSM Shield Layer v1.8 — Multi-Response Ranked Production Release")
