@@ -6,7 +6,7 @@ import re
 # --- 1. UI CONFIGURATION & HIGH-CONTRAST STYLING ---
 st.set_page_config(
     page_title="Service Desk Knowledge Base Engine",
-    layout="wide",  # Widened to support your large job operations tables cleanly
+    layout="wide",  # Widened to support large job operations tables cleanly
     initial_sidebar_state="collapsed"
 )
 
@@ -60,8 +60,8 @@ def load_and_parse_text_kb():
     
     with open(filename, "r", encoding="utf-8") as f:
         for line in f:
-            # FIX: Safely remove the metadata anchors without breaking string boundaries
-            cleaned_line = re.sub(r'\', '', line)
+            # Clean up the bracket metadata source anchors safely using matching strings
+            cleaned_line = re.sub(r"\", "", line)
             line_str = cleaned_line.strip()
             
             if not line_str:
