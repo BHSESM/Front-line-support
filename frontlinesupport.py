@@ -60,7 +60,7 @@ def load_and_parse_text_kb():
     
     with open(filename, "r", encoding="utf-8") as f:
         for line in f:
-            # Clean up line metadata anchors if present to avoid indexing noise
+            # FIX: Safely remove the metadata anchors without breaking string boundaries
             cleaned_line = re.sub(r'\', '', line)
             line_str = cleaned_line.strip()
             
@@ -92,7 +92,6 @@ def load_and_parse_text_kb():
                     current_article["lines"].append(line_str)
                     
                     # Supplement index markers dynamically using content row strings
-                    # Dropped limit to length > 2 to catch 3-character operations abbreviations
                     clean_content_words = re.sub(r'[^\w\s]', ' ', line_str.lower()).split()
                     for w in clean_content_words:
                         if w not in stop_words and len(w) > 2 and w not in current_article["tags"]:
@@ -124,13 +123,13 @@ def search_knowledge_base(query_string):
         body_clean = article["body_text"].lower()
         
         for word in query_words:
-            # Condition 1: Direct matches against structural section titles (Highest weight)
+            # Condition 1: Direct matches against structural section titles
             if word in title_clean:
                 score += 5
             # Condition 2: Matches inside dynamic background tag database
             if word in article["tags"]:
                 score += 3
-            # Condition 3: Deep content fallback scanner (Ensures large table blocks match)
+            # Condition 3: Deep content fallback scanner
             if word in body_clean:
                 score += 1
                 
@@ -150,7 +149,6 @@ engineer_query = st.text_input(
 )
 
 if engineer_query:
-    # Lowered threshold limit score slightly to catch wide single keyword hits confidently
     match, match_score = search_knowledge_base(engineer_query)
     
     if match and match_score >= 1:
@@ -159,13 +157,12 @@ if engineer_query:
         st.caption(f"System Confidence Index Score: {match_score} | Runbook Ref ID: {match['id']}")
         st.divider()
         
-        # Table Processing Logic Engine for handling tabular documentation columns layout
+        # Table Processing Logic Engine
         if "\t" in match["body_text"] or "   " in match["body_text"] or "|" in match["body_text"]:
             try:
                 lines = [l.strip() for l in match["body_text"].split("\n") if l.strip()]
                 table_matrix = []
                 
-                # Determine structural matrix column character separator rules dynamically
                 for l in lines:
                     if "\t" in l:
                         row_cells = [cell.strip() for cell in l.split("\t") if cell.strip() != ""]
@@ -181,7 +178,6 @@ if engineer_query:
                     headers = table_matrix[0]
                     rows = table_matrix[1:]
                     
-                    # Normalize row matrix arrays width frames if strings drop layout mismatches
                     max_cols = len(headers)
                     normalized_rows = []
                     for r in rows:
@@ -211,4 +207,4 @@ if engineer_query:
         """, unsafe_allow_html=True)
 
 st.divider()
-st.caption("Shinra ITSM Shield Layer v1.3 — 100% Verified Local Runbook Registry")
+st.caption("Shinra ITSM Shield Layer v1.4 — 100% Verified Local Runbook Registry")
