@@ -6,7 +6,7 @@ import re
 # --- 1. UI CONFIGURATION & HIGH-CONTRAST STYLING ---
 st.set_page_config(
     page_title="Service Desk Knowledge Base Engine",
-    layout="wide",  # Widened to support large job operations tables cleanly
+    layout="wide",  
     initial_sidebar_state="collapsed"
 )
 
@@ -59,17 +59,17 @@ def load_and_parse_text_kb():
     stop_words = {"the", "and", "a", "of", "to", "in", "is", "for", "on", "with", "as", "by", "at", "an", "this", "that", "from"}
     
     with open(filename, "r", encoding="utf-8") as f:
-        for line in f:
-            # Clean up the bracket metadata source anchors safely using matching strings
-            cleaned_line = re.sub(r"\", "", line)
-            line_str = cleaned_line.strip()
+        for raw_line in f:
+            # CACHE BUSTER: Fully isolated string replacement logic avoiding any escape characters
+            anchor_pattern = r"\"
+            clean_line_string = re.sub(anchor_pattern, "", raw_line)
+            line_str = clean_line_string.strip()
             
             if not line_str:
                 if current_article and current_article["lines"]:
                     current_article["lines"].append("")
                 continue
                 
-            # A line starting with a hash (#) indicates a new document segment block
             if line_str.startswith("#"):
                 if current_article:
                     current_article["body_text"] = "\n".join(current_article["lines"])
@@ -77,7 +77,6 @@ def load_and_parse_text_kb():
                 
                 title = line_str.lstrip("# ").strip()
                 
-                # Auto-generate core lookup parameters from the structural header text
                 clean_title_words = re.sub(r'[^\w\s]', ' ', title.lower()).split()
                 auto_tags = [w for w in clean_title_words if w not in stop_words and len(w) > 1]
                 
@@ -91,13 +90,11 @@ def load_and_parse_text_kb():
                 if current_article:
                     current_article["lines"].append(line_str)
                     
-                    # Supplement index markers dynamically using content row strings
                     clean_content_words = re.sub(r'[^\w\s]', ' ', line_str.lower()).split()
                     for w in clean_content_words:
                         if w not in stop_words and len(w) > 2 and w not in current_article["tags"]:
                             current_article["tags"].append(w)
                             
-        # Commit the final remaining buffer segment block safely
         if current_article:
             current_article["body_text"] = "\n".join(current_article["lines"])
             articles.append(current_article)
@@ -123,13 +120,10 @@ def search_knowledge_base(query_string):
         body_clean = article["body_text"].lower()
         
         for word in query_words:
-            # Condition 1: Direct matches against structural section titles
             if word in title_clean:
                 score += 5
-            # Condition 2: Matches inside dynamic background tag database
             if word in article["tags"]:
                 score += 3
-            # Condition 3: Deep content fallback scanner
             if word in body_clean:
                 score += 1
                 
@@ -157,7 +151,6 @@ if engineer_query:
         st.caption(f"System Confidence Index Score: {match_score} | Runbook Ref ID: {match['id']}")
         st.divider()
         
-        # Table Processing Logic Engine
         if "\t" in match["body_text"] or "   " in match["body_text"] or "|" in match["body_text"]:
             try:
                 lines = [l.strip() for l in match["body_text"].split("\n") if l.strip()]
@@ -207,4 +200,4 @@ if engineer_query:
         """, unsafe_allow_html=True)
 
 st.divider()
-st.caption("Shinra ITSM Shield Layer v1.4 — 100% Verified Local Runbook Registry")
+st.caption("Shinra ITSM Shield Layer v1.5 — 100% Verified Local Runbook Registry")
