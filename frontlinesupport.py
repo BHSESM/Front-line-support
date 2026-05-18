@@ -45,9 +45,9 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. AUTOMATED PLAIN TEXT PARSER & AUTO-TAGGER ---
+# --- 2. AUTOMATED PLAIN TEXT PARSER & AUTO-TAGGER (HARD RESET VERSION) ---
 @st.cache_data
-def load_and_parse_text_kb():
+def fetch_and_compile_text_runbooks():
     filename = "knowledge_base.txt"
     if not os.path.exists(filename):
         st.error("Missing infrastructure file: 'knowledge_base.txt' not found in repository root.")
@@ -60,9 +60,8 @@ def load_and_parse_text_kb():
     
     with open(filename, "r", encoding="utf-8") as f:
         for raw_line in f:
-            # FIX: Clean out "" anchors purely via string splitting to bypass Python 3.14 regex restrictions entirely
+            # Clean out "" anchors purely via string splitting to bypass Python 3.14 regex restrictions entirely
             if "")
-                # Reconstruct line text excluding the metadata blocks
                 line_str = "".join([p for p in parts if ").strip()
             else:
                 line_str = raw_line.strip()
@@ -79,7 +78,7 @@ def load_and_parse_text_kb():
                 
                 title = line_str.lstrip("# ").strip()
                 
-                # Replace regex with a clean string replace approach for basic text tokenization
+                # Manual character stripping to eliminate regex engine constraints completely
                 clean_title = title.lower()
                 for char in [".", ",", "-", "/", "(", ")", "!", "?", ":", ";"]:
                     clean_title = clean_title.replace(char, " ")
@@ -112,7 +111,7 @@ def load_and_parse_text_kb():
             
     return articles
 
-KNOWLEDGE_BASE = load_and_parse_text_kb()
+KNOWLEDGE_BASE = fetch_and_compile_text_runbooks()
 
 # --- 3. ADVANCED SEARCH SCORING ENGINE ---
 def search_knowledge_base(query_string):
@@ -173,7 +172,6 @@ if engineer_query:
                     if "\t" in l:
                         row_cells = [cell.strip() for cell in l.split("\t") if cell.strip() != ""]
                     elif "   " in l:
-                        # Clean fallback split for tabbed spacing widths
                         row_cells = [cell.strip() for cell in l.split("   ") if cell.strip() != ""]
                     else:
                         row_cells = [cell.strip() for cell in l.split("|") if cell.strip() != ""]
