@@ -2,44 +2,73 @@ import streamlit as st
 import pandas as pd
 import requests
 
-# --- 1. UI CONFIGURATION & HIGH-CONTRAST STYLING ---
+# --- 1. UI CONFIGURATION & PROFESSIONAL LIGHT-THEMED STYLING ---
 st.set_page_config(
-    page_title="Service Desk Knowledge Base Engine",
+    page_title="Corporate Knowledge Base Engine",
     layout="wide",  
     initial_sidebar_state="collapsed"
 )
 
+# Deep clean corporate aesthetic injection with a light background framework
 st.markdown("""
     <style>
+    /* Neutral background alignment over light canvas text stream */
     .stApp {
-        background-color: #0e1117;
+        background: linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)), 
+                    url('https://github.com/BHSESM/Front-line-support/blob/e644eeaabc18d34618a112de07811c490eb69a24/BGsearch.jpg?raw=true');
+        background-size: cover;
+        background-attachment: fixed;
+        background-position: center;
     }
+    
+    /* Professional clean-cut card containment */
     .solution-card {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(0, 255, 204, 0.3);
-        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #dcdcdc;
+        border-radius: 8px;
         padding: 25px;
         margin-top: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
+    
+    /* Clean corporate text defaults override */
     h1, h2, h3, h4, h5, h6, p, span, label, li {
-        color: #ffffff !important;
+        color: #2c3e50 !important;
     }
+    
+    /* Subdued utility labels */
+    .stMarkdown caption, .stMarkdown small {
+        color: #7f8c8d !important;
+    }
+    
+    /* Input field label clarity enhancement */
+    div[data-testid="stTextInput"] label {
+        font-weight: bold !important;
+        font-size: 1rem !important;
+        color: #1a252f !important;
+    }
+
+    /* Structured Corporate Table Elements CSS */
     div[data-testid="stTable"] table {
         width: 100% !important;
-        color: #ffffff !important;
+        color: #2c3e50 !important;
+        border-collapse: collapse;
     }
     div[data-testid="stTable"] th {
-        background-color: rgba(0, 255, 204, 0.15) !important;
-        color: #00ffcc !important;
+        background-color: #f4f6f7 !important;
+        color: #1a252f !important;
         text-align: left !important;
         font-weight: bold !important;
         font-size: 0.85rem !important;
+        border-bottom: 2px solid #bdc3c7 !important;
+        padding: 10px !important;
     }
     div[data-testid="stTable"] td {
-        color: #ffffff !important;
-        background-color: rgba(255, 255, 255, 0.02) !important;
+        color: #2c3e50 !important;
+        background-color: #ffffff !important;
         font-size: 0.85rem !important;
+        border-bottom: 1px solid #ecf0f1 !important;
+        padding: 10px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -47,7 +76,6 @@ st.markdown("""
 # --- 2. LIVE GITHUB REPOSITORY FETCH LAYER ---
 @st.cache_data(ttl=300)  # Dynamic 5-minute data stream refresh interval
 def fetch_live_github_database():
-    # Locked to your exact live runbook repository text stream
     RAW_GITHUB_URL = "https://raw.githubusercontent.com/BHSESM/Front-line-support/refs/heads/main/knowledge_base.txt"
     
     try:
@@ -95,7 +123,7 @@ def compile_live_runbooks(raw_text_data):
             auto_tags = [w for w in clean_title_words if w not in stop_words and len(w) > 1]
             
             current_article = {
-                "id": f"GIT-KB-{len(articles) + 1:03d}",
+                "id": f"KB-REF-{len(articles) + 1:03d}",
                 "title": title,
                 "tags": auto_tags,
                 "lines": []
@@ -119,7 +147,7 @@ def compile_live_runbooks(raw_text_data):
         
     return articles
 
-# Pull, build and parse your live text database natively into active RAM frames
+# Pull data assets into runtime space
 RAW_DATA = fetch_live_github_database()
 KNOWLEDGE_BASE = compile_live_runbooks(RAW_DATA)
 
@@ -154,31 +182,42 @@ def search_knowledge_base_multi(query_string):
     matched_results.sort(key=lambda x: x[1], reverse=True)
     return matched_results
 
-# --- 5. INTERFACE HUB DISPLAY ---
-st.title("🤖 Front-Line Resolution Shield")
-st.write("Instant verification repository node. Connected live to GitHub data stream.")
+# --- 5. INTERFACE HUB DISPLAY (BUSINESS LEVEL HEADER) ---
+head_col1, head_col2 = st.columns([4, 1])
+
+with head_col1:
+    st.title("Sureserve Group Knowledge Base Engine")
+    st.markdown("**Centralized Cross-Departmental Resolution Portal** | Accessible by Service Desk, Dispatch, and Senior Leadership Teams.")
+
+with head_col2:
+    # Logo placement with explicit layout formatting tags
+    logo_url = "https://github.com/BHSESM/Front-line-support/blob/3af0eb8ca9ffdfae402502efad9f92e03dfd6944/Sureserve2.jpg?raw=true"
+    st.image(logo_url, use_container_width=True)
+
+st.divider()
 
 if not KNOWLEDGE_BASE:
-    st.warning("🔄 System initializing or waiting for connection to GitHub runbook source file...")
+    st.warning("🔄 System initializing or synchronizing data frames with GitHub master source ledger...")
 else:
     engineer_query = st.text_input(
-        "Describe the issue or enter keywords:", 
-        placeholder="e.g., Job types, SX1, flashing green light, ALCS, E62..."
+        "Search Knowledge Base:", 
+        placeholder="Enter search queries or criteria (e.g., Job types, SX1, flashing green light, ALCS, E62...)"
     )
 
     if engineer_query:
         results = search_knowledge_base_multi(engineer_query)
         
         if results:
-            st.write(f"### Found {len(results)} relevant matching runbook paths:")
+            st.write(f"### Found {len(results)} matching resolution records:")
             
             for match, match_score in results:
                 st.markdown('<div class="solution-card">', unsafe_allow_html=True)
-                st.subheader(f"✅ Runbook Title: {match['title']}")
-                st.caption(f"System Confidence Index Score: {match_score} | Runbook Ref ID: {match['id']}")
+                st.subheader(f"📖 {match['title']}")
+                st.caption(f"Relevance Index: {match_score} | Document Ref ID: {match['id']}")
                 st.divider()
                 
-                if "\t" in match["body_text"] or "   " in match["body_text"] or "|" in match["body_text"]:
+                # Render logic checking for multi-column data structures within strings
+                if "\t" in match["body_text"] or "    " in match["body_text"] or "|" in match["body_text"]:
                     try:
                         lines = [l.strip() for l in match["body_text"].split("\n") if l.strip()]
                         table_matrix = []
@@ -186,8 +225,8 @@ else:
                         for l in lines:
                             if "\t" in l:
                                 row_cells = [cell.strip() for cell in l.split("\t") if cell.strip() != ""]
-                            elif "   " in l:
-                                row_cells = [cell.strip() for cell in l.split("   ") if cell.strip() != ""]
+                            elif "    " in l:
+                                row_cells = [cell.strip() for cell in l.split("    ") if cell.strip() != ""]
                             else:
                                 row_cells = [cell.strip() for cell in l.split("|") if cell.strip() != ""]
                             
@@ -218,13 +257,13 @@ else:
                     
                 st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.error("❌ No matching resolution path located inside local database frames.")
+            st.error("❌ No exact resolution paths found for the entered keywords.")
             st.markdown("""
-                <div style="background: rgba(255, 75, 75, 0.1); padding: 15px; border-radius: 8px; border: 1px dashed #ff4b4b; color: #ffffff;">
-                    <strong style="color: #ff4b4b;">Procedural Action Required:</strong> The current scenario doesn't match an automated script.<br> 
-                    Please raise a manual <strong>Tier 2 Service Desk Escalation Request</strong> via the primary workspace hub.
+                <div style="background: rgba(231, 76, 60, 0.08); padding: 15px; border-radius: 6px; border: 1px solid #e74c3c; color: #c0392b;">
+                    <strong>Notice:</strong> The query entered did not match existing knowledge articles.<br> 
+                    Please coordinate across systems or raise a standardized tracking query with management.
                 </div>
             """, unsafe_allow_html=True)
 
 st.divider()
-st.caption("Shinra ITSM Shield Layer v1.9 — Decoupled Cloud Live Stream Production Release")
+st.caption("Sureserve Group Knowledge Management Hub v2.0 — Production Build Consolidation")
