@@ -9,23 +9,17 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Deep clean corporate aesthetic injection with fixed background layering
 st.markdown("""
     <style>
-    /* Force background rendering on Streamlit's structural layout container */
     div[data-testid="stAppViewContainer"] {
         background-image: url('https://github.com/BHSESM/Front-line-support/blob/e644eeaabc18d34618a112de07811c490eb69a24/BGsearch.jpg?raw=true');
         background-size: cover;
         background-attachment: fixed;
         background-position: center;
     }
-    
-    /* Clear out main block background to let the underlying texture shine through */
     div[data-testid="stMainBlockContainer"] {
         background-color: transparent;
     }
-    
-    /* High-contrast crisp cards for search results */
     .solution-card {
         background: rgba(255, 255, 255, 0.98);
         border: 1px solid #dcdcdc;
@@ -34,24 +28,16 @@ st.markdown("""
         margin-top: 20px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
     }
-    
-    /* Strong corporate typography for high visibility */
     h1, h2, h3, h4, h5, h6, p, span, label, li {
         color: #111111 !important;
         font-weight: 500;
     }
-    
-    /* Bold styling for titles */
     h1, h2, h3 {
         font-weight: 700 !important;
     }
-    
-    /* Subdued utility labels */
     .stMarkdown caption, .stMarkdown small {
         color: #555555 !important;
     }
-    
-    /* Ensure text input stands out clearly against the background */
     div[data-testid="stTextInput"] {
         background: rgba(255, 255, 255, 0.9);
         padding: 10px;
@@ -63,8 +49,6 @@ st.markdown("""
         font-size: 1.05rem !important;
         color: #111111 !important;
     }
-
-    /* Structured Corporate Table Elements CSS */
     div[data-testid="stTable"] table {
         width: 100% !important;
         color: #111111 !important;
@@ -86,8 +70,6 @@ st.markdown("""
         border-bottom: 1px solid #e6e6e6 !important;
         padding: 10px !important;
     }
-    
-    /* Container to cleanly bound the corporate logo scale */
     .logo-container {
         text-align: right;
     }
@@ -99,10 +81,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. LIVE GITHUB REPOSITORY FETCH LAYER ---
-@st.cache_data(ttl=300)  # Dynamic 5-minute data stream refresh interval
+# --- 2. LIVE GITHUB REPOSITORY FETCH LAYER (.MD SWITCHEDED) ---
+@st.cache_data(ttl=300)
 def fetch_live_github_database():
-    RAW_GITHUB_URL = "https://raw.githubusercontent.com/BHSESM/Front-line-support/refs/heads/main/knowledge_base.txt"
+    # Switched target from knowledge_base.txt to knowledge_base.md
+    RAW_GITHUB_URL = "https://raw.githubusercontent.com/BHSESM/Front-line-support/refs/heads/main/knowledge_base.md"
     
     try:
         response = requests.get(RAW_GITHUB_URL)
@@ -173,11 +156,10 @@ def compile_live_runbooks(raw_text_data):
         
     return articles
 
-# Pull data assets into runtime space
 RAW_DATA = fetch_live_github_database()
 KNOWLEDGE_BASE = compile_live_runbooks(RAW_DATA)
 
-# --- 4. ADVANCED SCORING SEARCH RUNTIME (MULTI-MATCH ENGINE) ---
+# --- 4. ADVANCED SCORING SEARCH RUNTIME ---
 def search_knowledge_base_multi(query_string):
     if not query_string.strip() or not KNOWLEDGE_BASE:
         return []
@@ -208,7 +190,7 @@ def search_knowledge_base_multi(query_string):
     matched_results.sort(key=lambda x: x[1], reverse=True)
     return matched_results
 
-# --- 5. INTERFACE HUB DISPLAY (BUSINESS LEVEL HEADER) ---
+# --- 5. INTERFACE HUB DISPLAY ---
 head_col1, head_col2 = st.columns([5, 1])
 
 with head_col1:
@@ -216,7 +198,6 @@ with head_col1:
     st.markdown("**Centralized Cross-Departmental Resolution Portal** | Accessible by Service Desk, Dispatch, and Senior Leadership Teams.")
 
 with head_col2:
-    # Logo deployment with custom HTML styling layout overrides
     logo_url = "https://github.com/BHSESM/Front-line-support/blob/3af0eb8ca9ffdfae402502efad9f92e03dfd6944/Sureserve2.jpg?raw=true"
     st.markdown(f"""
         <div class="logo-container">
@@ -246,7 +227,6 @@ else:
                 st.caption(f"Relevance Index: {match_score} | Document Ref ID: {match['id']}")
                 st.divider()
                 
-                # Render logic checking for multi-column data structures within strings
                 if "\t" in match["body_text"] or "    " in match["body_text"] or "|" in match["body_text"]:
                     try:
                         lines = [l.strip() for l in match["body_text"].split("\n") if l.strip()]
@@ -279,11 +259,12 @@ else:
                             formatted_df = pd.DataFrame(normalized_rows, columns=headers)
                             st.table(formatted_df)
                         else:
-                            st.markdown(match["body_text"])
+                            # Enabled HTML/Image processing capability on Markdown display bounds
+                            st.markdown(match["body_text"], unsafe_allow_html=True)
                     except Exception:
-                        st.markdown(match["body_text"])
+                        st.markdown(match["body_text"], unsafe_allow_html=True)
                 else:
-                    st.markdown(match["body_text"])
+                    st.markdown(match["body_text"], unsafe_allow_html=True)
                     
                 st.markdown('</div>', unsafe_allow_html=True)
         else:
