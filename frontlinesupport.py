@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 import requests
+import urllib.parse
 
-# --- 1. UI CONFIGURATION & SIGNATURE CORPORATE LIGHT-THEMED STYLING ---
+# --- 1. UI CONFIGURATION & PROFESSIONAL CORPORATE STYLING ---
 st.set_page_config(
     page_title="Corporate Knowledge Base Engine",
     layout="wide",  
@@ -11,7 +12,6 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    /* Direct injection to target Streamlit base layouts over the custom texture */
     div[data-testid="stAppViewContainer"] {
         background-image: url('https://github.com/BHSESM/Front-line-support/blob/e644eeaabc18d34618a112de07811c490eb69a24/BGsearch.jpg?raw=true');
         background-size: cover;
@@ -21,8 +21,6 @@ st.markdown("""
     div[data-testid="stMainBlockContainer"] {
         background-color: transparent;
     }
-    
-    /* Clean, defined corporate white card for crisp content separation */
     .solution-card {
         background-color: #ffffff !important;
         border: 1px solid #e2e8f0;
@@ -30,66 +28,15 @@ st.markdown("""
         padding: 24px;
         margin-top: 16px;
         margin-bottom: 16px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
-    
-    /* Global corporate typography overrides */
     h1, h2, h3, h4, h5, h6, p, span, label, li {
         color: #1a202c !important;
     }
-    h1, h2, h3 {
-        font-weight: 700 !important;
-    }
-    p, li {
-        font-weight: 400 !important;
-        line-height: 1.6;
-    }
-    
-    /* Formatting link buttons to look professional */
-    .solution-card a {
-        color: #2b6cb0 !important;
-        text-decoration: underline !important;
-        font-weight: 600 !important;
-    }
-    .solution-card a:hover {
-        color: #1a433e !important;
-    }
-    
-    /* Input hub layout clarity */
     div[data-testid="stTextInput"] {
         background: rgba(255, 255, 255, 0.95);
         padding: 12px;
         border-radius: 6px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    div[data-testid="stTextInput"] label {
-        font-weight: 700 !important;
-        font-size: 1.05rem !important;
-        color: #2d3748 !important;
-    }
-
-    /* Standard Data Tables Styles overrides */
-    div[data-testid="stTable"] table {
-        width: 100% !important;
-        color: #1a202c !important;
-        border-collapse: collapse;
-        margin-top: 10px;
-    }
-    div[data-testid="stTable"] th {
-        background-color: #f7fafc !important;
-        color: #2d3748 !important;
-        text-align: left !important;
-        font-weight: 700 !important;
-        font-size: 0.85rem !important;
-        border-bottom: 2px solid #e2e8f0 !important;
-        padding: 12px !important;
-    }
-    div[data-testid="stTable"] td {
-        color: #4a5568 !important;
-        background-color: #ffffff !important;
-        font-size: 0.85rem !important;
-        border-bottom: 1px solid #edf2f7 !important;
-        padding: 12px !important;
     }
     .logo-container {
         text-align: right;
@@ -97,179 +44,140 @@ st.markdown("""
     .logo-container img {
         max-width: 160px;
         height: auto;
-        border-radius: 4px;
     }
+    /* Meta tags badge design styling */
+    .file-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+    }
+    .badge-pdf { background-color: #fee2e2; color: #991b1b; }
+    .badge-image { background-color: #fef3c7; color: #92400e; }
+    .badge-ppt { background-color: #e0f2fe; color: #075985; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. LIVE GITHUB REPOSITORY FETCH LAYER ---
-@st.cache_data(ttl=300)
-def fetch_live_github_database():
-    RAW_GITHUB_URL = "https://raw.githubusercontent.com/BHSESM/Front-line-support/refs/heads/main/knowledge_base.md"
-    try:
-        response = requests.get(RAW_GITHUB_URL)
-        if response.status_code == 200:
-            return response.text
-        else:
-            st.error(f"Failed to fetch database from GitHub. Status Code: {response.status_code}")
-            return ""
-    except Exception as e:
-        st.error(f"Connection error to data repository: {str(e)}")
-        return ""
+# --- 2. AUTOMATED DIRECTORY SCANNING HUB ---
+GITHUB_USER = "BHSESM"
+GITHUB_REPO = "Front-line-support"
 
-# --- 3. DYNAMIC PARSER CORE ENGINE ---
-def compile_live_runbooks(raw_text_data):
-    if not raw_text_data.strip():
-        return []
-        
-    articles = []
-    current_article = None
-    stop_words = {"the", "and", "a", "of", "to", "in", "is", "for", "on", "with", "as", "by", "at", "an", "this", "that", "from"}
-    lines = raw_text_data.strip().split("\n")
+@st.cache_data(ttl=60)  # Checked folders refresh every 60 seconds
+def scan_github_folders():
+    """Scans repository directories using public API frameworks to index live assets"""
+    categories = {
+        "pdfs": "📄 PDF Document",
+        "images": "🖼️ Visual Reference / Image",
+        "powerpoints": "📊 PowerPoint Presentation"
+    }
+    indexed_files = []
     
-    for raw_line in lines:
-        line_str = raw_line.strip()
-        if not line_str:
-            if current_article and current_article["lines"]:
-                current_article["lines"].append("")
-            continue
-            
-        if line_str.startswith("#"):
-            if current_article:
-                current_article["body_text"] = "\n".join(current_article["lines"])
-                articles.append(current_article)
-            
-            title = line_str.lstrip("# ").strip()
-            clean_title = title.lower()
-            for char in [".", ",", "-", "/", "(", ")", "!", "?", ":", ";"]:
-                clean_title = clean_title.replace(char, " ")
-            clean_title_words = clean_title.split()
-            auto_tags = [w for w in clean_title_words if w not in stop_words and len(w) > 1]
-            
-            current_article = {
-                "id": f"KB-REF-{len(articles) + 1:03d}",
-                "title": title,
-                "tags": auto_tags,
-                "lines": []
-            }
-        else:
-            if current_article:
-                current_article["lines"].append(line_str)
-                clean_content = line_str.lower()
-                for char in [".", ",", "-", "/", "(", ")", "!", "?", ":", ";", "|"]:
-                    clean_content = clean_content.replace(char, " ")
-                clean_content_words = clean_content.split()
-                
-                for w in clean_content_words:
-                    if w not in stop_words and len(w) > 2 and w not in current_article["tags"]:
-                        current_article["tags"].append(w)
+    for folder_name, display_type in categories.items():
+        # Hit public repository folder schema
+        api_url = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/{folder_name}"
+        try:
+            response = requests.get(api_url)
+            if response.status_code == 200:
+                files_list = response.json()
+                for file_obj in files_list:
+                    # Isolate standard files vs folders
+                    if file_obj["type"] == "file":
+                        filename = file_obj["name"]
                         
-    if current_article:
-        current_article["body_text"] = "\n".join(current_article["lines"])
-        articles.append(current_article)
-    return articles
+                        # Generate clean human-readable title by pulling off trailing extension format
+                        clean_title = filename.rsplit('.', 1)[0]
+                        
+                        # Fixes space mapping directly for raw content streaming loops
+                        encoded_name = urllib.parse.quote(filename)
+                        download_url = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/{folder_name}/{encoded_name}"
+                        
+                        indexed_files.append({
+                            "title": clean_title,
+                            "filename": filename,
+                            "type": display_type,
+                            "folder": folder_name,
+                            "url": download_url
+                        })
+        except:
+            pass  # Fail gracefully if a specific folder hasn't been created yet
+            
+    return indexed_files
 
-RAW_DATA = fetch_live_github_database()
-KNOWLEDGE_BASE = compile_live_runbooks(RAW_DATA)
+# Compile database from raw directory listings
+LIVE_ASSET_DATABASE = scan_github_folders()
 
-# --- 4. ADVANCED SCORING SEARCH RUNTIME ---
-def search_knowledge_base_multi(query_string):
-    if not query_string.strip() or not KNOWLEDGE_BASE:
+# --- 3. DYNAMIC ASSET SEARCH CORE ---
+def search_assets(query_string):
+    if not query_string.strip() or not LIVE_ASSET_DATABASE:
         return []
         
-    cleaned_query = query_string.lower()
-    for char in [".", ",", "-", "/", "(", ")", "!", "?", ":", ";"]:
-        cleaned_query = cleaned_query.replace(char, " ")
-    query_words = cleaned_query.split()
+    query_words = query_string.lower().split()
     matched_results = []
     
-    for article in KNOWLEDGE_BASE:
+    for asset in LIVE_ASSET_DATABASE:
         score = 0
-        title_clean = article["title"].lower()
-        body_clean = article["body_text"].lower()
+        title_lower = asset["title"].lower()
         
+        # Priority mapping score index based on keywords match weight counts
         for word in query_words:
-            if word in title_clean:
-                score += 5
-            if word in article["tags"]:
-                score += 3
-            if word in body_clean:
-                score += 1
+            if word in title_lower:
+                score += 10
                 
-        if score >= 1:
-            matched_results.append((article, score))
+        if score > 0:
+            matched_results.append(asset)
             
-    matched_results.sort(key=lambda x: x[1], reverse=True)
     return matched_results
 
-# --- 5. INTERFACE HUB DISPLAY ---
+# --- 4. INTERFACE HUB DISPLAY ---
 head_col1, head_col2 = st.columns([5, 1])
-
 with head_col1:
     st.title("Sureserve Group Knowledge Base Engine")
-    st.markdown("**Centralized Cross-Departmental Resolution Portal** | Managed seamlessly by Service Desk, Dispatch, and SLT frameworks.")
-
+    st.markdown("**Centralized Cross-Departmental Asset Portal** | Fully Automated Zero-Maintenance Directory Service.")
 with head_col2:
     logo_url = "https://github.com/BHSESM/Front-line-support/blob/3af0eb8ca9ffdfae402502efad9f92e03dfd6944/Sureserve2.jpg?raw=true"
     st.markdown(f'<div class="logo-container"><img src="{logo_url}"></div>', unsafe_allow_html=True)
 
 st.divider()
 
-if not KNOWLEDGE_BASE:
-    st.warning("🔄 Connecting to live cross-departmental documentation files...")
+if not LIVE_ASSET_DATABASE:
+    st.info("ℹ️ Repositories directory mapping empty. Please verify file uploads exist inside `/pdfs`, `/images`, or `/powerpoints` on GitHub.")
 else:
-    engineer_query = st.text_input(
-        "Search Knowledge Base:", 
-        placeholder="Enter criteria or keywords (e.g., 3PH, Job types, SX1, ALCS, E62...)"
+    user_query = st.text_input(
+        "Search Group Documents & Assets:", 
+        placeholder="Type search terms here (e.g., ECO, 3PH, Termination, Policy...)"
     )
 
-    if engineer_query:
-        results = search_knowledge_base_multi(engineer_query)
+    if user_query:
+        search_matches = search_assets(user_query)
         
-        if results:
-            st.write(f"### Found {len(results)} matching resolution records:")
+        if search_matches:
+            st.write(f"### Located {len(search_matches)} Matching Assets:")
             
-            for match, match_score in results:
-                # Wrap everything safely inside the unified crisp white card boundaries
+            for asset in search_matches:
                 st.markdown('<div class="solution-card">', unsafe_allow_html=True)
-                st.subheader(f"📘 {match['title']}")
-                st.caption(f"Relevance Index Score: {match_score} | Document Ref ID: {match['id']}")
-                st.divider()
                 
-                # Check explicitly if a formal data grid matrix structure exists in prose before calling st.table
-                if "|" in match["body_text"] and "\n" in match["body_text"]:
-                    try:
-                        lines = [l.strip() for l in match["body_text"].split("\n") if l.strip()]
-                        table_matrix = []
-                        
-                        for l in lines:
-                            if "|" in l:
-                                row_cells = [cell.strip() for cell in l.split("|") if cell.strip() != ""]
-                                if row_cells and not all(c == '-' for c in row_cells[0]):
-                                    table_matrix.append(row_cells)
-                        
-                        if table_matrix and len(table_matrix) > 1:
-                            headers = table_matrix[0]
-                            rows = table_matrix[1:]
-                            max_cols = len(headers)
-                            normalized_rows = []
-                            for r in rows:
-                                if len(r) < max_cols:
-                                    r = r + [""] * (max_cols - len(r))
-                                elif len(r) > max_cols:
-                                    r = r[:max_cols]
-                                normalized_rows.append(r)
-                                
-                            formatted_df = pd.DataFrame(normalized_rows, columns=headers)
-                            st.table(formatted_df)
-                        else:
-                            st.markdown(match["body_text"], unsafe_allow_html=True)
-                    except Exception:
-                        st.markdown(match["body_text"], unsafe_allow_html=True)
+                # Dynamic badge application
+                badge_class = "badge-pdf" if asset["folder"] == "pdfs" else ("badge-image" if asset["folder"] == "images" else "badge-ppt")
+                st.markdown(f'<span class="file-badge {badge_class}">{asset["type"]}</span>', unsafe_allow_html=True)
+                
+                st.subheader(asset["title"])
+                st.caption(f"File System Source Target: /{asset['folder']}/{asset['filename']}")
+                st.write("")
+                
+                # Layout logic presentation fork
+                if asset["folder"] == "images":
+                    # Direct layout render embedding for visual files
+                    st.image(asset["url"], use_container_width=True)
                 else:
-                    # Clean prose output directly rendering structural anchors and media links
-                    st.markdown(match["body_text"], unsafe_allow_html=True)
+                    # Standard execution tracking for documentation download streams
+                    st.link_button(f"📥 Launch & View Asset: {asset['filename']}", asset["url"])
                     
                 st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.error("❌ No matching internal records located inside current documentation database.")
+            st.error("❌ No matching internal assets located inside directory index structures.")
+
+st.divider()
+st.caption("Sureserve Group Knowledge Management Hub v3.0 — Automated Framework Consolidation")
