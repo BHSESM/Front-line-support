@@ -70,6 +70,16 @@ st.markdown("""
         border-bottom: 1px solid #ecf0f1 !important;
         padding: 10px !important;
     }
+    
+    /* Container to cleanly bound the corporate logo scale */
+    .logo-container {
+        text-align: right;
+    }
+    .logo-container img {
+        max-width: 160px;
+        height: auto;
+        border-radius: 4px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -183,16 +193,20 @@ def search_knowledge_base_multi(query_string):
     return matched_results
 
 # --- 5. INTERFACE HUB DISPLAY (BUSINESS LEVEL HEADER) ---
-head_col1, head_col2 = st.columns([4, 1])
+head_col1, head_col2 = st.columns([5, 1])
 
 with head_col1:
     st.title("Sureserve Group Knowledge Base Engine")
     st.markdown("**Centralized Cross-Departmental Resolution Portal** | Accessible by Service Desk, Dispatch, and Senior Leadership Teams.")
 
 with head_col2:
-    # Logo placement with explicit layout formatting tags
+    # Logo deployment with custom HTML styling layout overrides
     logo_url = "https://github.com/BHSESM/Front-line-support/blob/3af0eb8ca9ffdfae402502efad9f92e03dfd6944/Sureserve2.jpg?raw=true"
-    st.image(logo_url, use_container_width=True)
+    st.markdown(f"""
+        <div class="logo-container">
+            <img src="{logo_url}">
+        </div>
+    """, unsafe_allow_html=True)
 
 st.divider()
 
