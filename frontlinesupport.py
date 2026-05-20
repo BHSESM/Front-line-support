@@ -9,65 +9,81 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Deep clean corporate aesthetic injection with a light background framework
+# Deep clean corporate aesthetic injection with fixed background layering
 st.markdown("""
     <style>
-    /* Neutral background alignment over light canvas text stream */
-    .stApp {
-        background: linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)), 
-                    url('https://github.com/BHSESM/Front-line-support/blob/e644eeaabc18d34618a112de07811c490eb69a24/BGsearch.jpg?raw=true');
+    /* Force background rendering on Streamlit's structural layout container */
+    div[data-testid="stAppViewContainer"] {
+        background-image: url('https://github.com/BHSESM/Front-line-support/blob/e644eeaabc18d34618a112de07811c490eb69a24/BGsearch.jpg?raw=true');
         background-size: cover;
         background-attachment: fixed;
         background-position: center;
     }
     
-    /* Professional clean-cut card containment */
+    /* Clear out main block background to let the underlying texture shine through */
+    div[data-testid="stMainBlockContainer"] {
+        background-color: transparent;
+    }
+    
+    /* High-contrast crisp cards for search results */
     .solution-card {
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(255, 255, 255, 0.98);
         border: 1px solid #dcdcdc;
         border-radius: 8px;
         padding: 25px;
         margin-top: 20px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
     }
     
-    /* Clean corporate text defaults override */
+    /* Strong corporate typography for high visibility */
     h1, h2, h3, h4, h5, h6, p, span, label, li {
-        color: #2c3e50 !important;
+        color: #111111 !important;
+        font-weight: 500;
+    }
+    
+    /* Bold styling for titles */
+    h1, h2, h3 {
+        font-weight: 700 !important;
     }
     
     /* Subdued utility labels */
     .stMarkdown caption, .stMarkdown small {
-        color: #7f8c8d !important;
+        color: #555555 !important;
     }
     
-    /* Input field label clarity enhancement */
+    /* Ensure text input stands out clearly against the background */
+    div[data-testid="stTextInput"] {
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
     div[data-testid="stTextInput"] label {
         font-weight: bold !important;
-        font-size: 1rem !important;
-        color: #1a252f !important;
+        font-size: 1.05rem !important;
+        color: #111111 !important;
     }
 
     /* Structured Corporate Table Elements CSS */
     div[data-testid="stTable"] table {
         width: 100% !important;
-        color: #2c3e50 !important;
+        color: #111111 !important;
         border-collapse: collapse;
     }
     div[data-testid="stTable"] th {
-        background-color: #f4f6f7 !important;
-        color: #1a252f !important;
+        background-color: #f1f3f5 !important;
+        color: #111111 !important;
         text-align: left !important;
         font-weight: bold !important;
         font-size: 0.85rem !important;
-        border-bottom: 2px solid #bdc3c7 !important;
+        border-bottom: 2px solid #cccccc !important;
         padding: 10px !important;
     }
     div[data-testid="stTable"] td {
-        color: #2c3e50 !important;
+        color: #111111 !important;
         background-color: #ffffff !important;
         font-size: 0.85rem !important;
-        border-bottom: 1px solid #ecf0f1 !important;
+        border-bottom: 1px solid #e6e6e6 !important;
         padding: 10px !important;
     }
     
